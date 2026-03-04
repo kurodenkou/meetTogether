@@ -6,7 +6,10 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  pingInterval: 10000, // send ping every 10 s
+  pingTimeout: 5000,   // drop if no pong within 5 s → dead tabs detected in ~15 s
+});
 
 app.use(express.static(path.join(__dirname, 'public')));
 
