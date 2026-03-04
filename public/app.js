@@ -366,9 +366,10 @@ window.toggleScreenShare = async function () {
       if (sender) sender.replaceTrack(screenTrack);
     });
 
-    // Show screen in local video (don't mirror it)
-    document.getElementById('local-tile').querySelector('video').srcObject = screenStream;
-    document.getElementById('local-tile').querySelector('video').style.transform = 'none';
+    // Show a placeholder on the local tile instead of the screen itself
+    const localVid = document.getElementById('local-tile').querySelector('video');
+    localVid.classList.add('hidden');
+    showScreenShareIndicator();
 
     isScreenSharing = true;
     btn.classList.add('active');
@@ -400,8 +401,8 @@ async function stopScreenShare() {
 
   // Restore local video view
   const localVid = document.getElementById('local-tile').querySelector('video');
-  localVid.srcObject = localStream;
-  localVid.style.transform = ''; // restore mirror
+  localVid.classList.remove('hidden');
+  hideScreenShareIndicator();
 
   isScreenSharing = false;
   const btn = document.getElementById('screen-btn');
@@ -410,6 +411,23 @@ async function stopScreenShare() {
   btn.classList.remove('active');
   label.textContent = 'Share Screen';
   icon.textContent = '🖥';
+}
+
+function showScreenShareIndicator() {
+  let el = document.getElementById('screen-share-indicator');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'screen-share-indicator';
+    el.className = 'screen-share-indicator';
+    el.innerHTML = '<span>🖥</span><span>Sharing your screen</span>';
+    document.getElementById('local-tile').appendChild(el);
+  }
+  el.classList.remove('hidden');
+}
+
+function hideScreenShareIndicator() {
+  const el = document.getElementById('screen-share-indicator');
+  if (el) el.classList.add('hidden');
 }
 
 // =====================================================
