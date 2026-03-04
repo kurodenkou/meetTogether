@@ -206,6 +206,14 @@ async function createPeerConnection(peerId, isInitiator) {
     });
   }
 
+  // Pre-create the remote stream and wire it to the tile's video element.
+  // Adding tracks to it as they arrive avoids relying on event.streams[0],
+  // which can be undefined in some browsers with unified-plan SDP.
+  const remoteStream = new MediaStream();
+  if (peerMeta[peerId] && peerMeta[peerId].videoEl) {
+    peerMeta[peerId].videoEl.srcObject = remoteStream;
+  }
+
   // ICE candidate → send to peer
   pc.onicecandidate = (event) => {
     if (event.candidate) {
@@ -213,18 +221,14 @@ async function createPeerConnection(peerId, isInitiator) {
     }
   };
 
-  // Remote track arrives → populate the existing tile with the live stream
+  // Remote track arrives → add to the pre-created stream
   pc.ontrack = (event) => {
-    const stream = event.streams[0];
-    if (!stream) return;
-    if (peerMeta[peerId] && peerMeta[peerId].videoEl) {
-      peerMeta[peerId].videoEl.srcObject = stream;
-      // Hide avatar now that video is flowing
-      if (peerMeta[peerId].avatarEl) {
-        peerMeta[peerId].avatarEl.classList.add('hidden');
-      }
-    } else {
-      addRemoteVideoTile(peerId, stream);
+    remoteStream.addTrack(event.track);
+    if (peerMeta[peerId] && peerMeta[peerId].avatarEl) {
+      peerMeta[peerId].avatarEl.classList.add('hidden');
+    }
+    if (!peerMeta[peerId] || !peerMeta[peerId].videoEl) {
+      addRemoteVideoTile(peerId, remoteStream);
     }
   };
 
