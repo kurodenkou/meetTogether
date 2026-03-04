@@ -16,6 +16,7 @@ const ICE_CONFIG = {
 };
 
 // ---- State ----
+let hasJoinedRoom = false;
 let localStream = null;
 let screenStream = null;
 let isAudioMuted = false;
@@ -81,6 +82,7 @@ async function init() {
 
   // Join the room
   socket.emit('join-room', ROOM_ID, USER_NAME);
+  hasJoinedRoom = true;
   startTimer();
   updateGridLayout();
 }
@@ -90,6 +92,7 @@ window.joinWithoutMedia = function () {
   permOverlay.classList.add('hidden');
   localStream = new MediaStream(); // empty stream
   socket.emit('join-room', ROOM_ID, USER_NAME);
+  hasJoinedRoom = true;
   startTimer();
   updateGridLayout();
 };
@@ -100,6 +103,11 @@ window.joinWithoutMedia = function () {
 
 socket.on('connect', () => {
   setStatus('connected', 'Connected');
+  if (hasJoinedRoom) {
+    // Socket reconnected — tear down stale peer connections and re-join the room
+    Object.keys(peers).forEach((peerId) => removePeer(peerId));
+    socket.emit('join-room', ROOM_ID, USER_NAME);
+  }
 });
 
 socket.on('disconnect', () => {

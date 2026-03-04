@@ -19,7 +19,11 @@ const rooms = new Map();
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
+  // Track which room this socket is in
+  let currentRoomId = null;
+
   socket.on('join-room', (roomId, userName) => {
+    currentRoomId = roomId;
     socket.join(roomId);
 
     if (!rooms.has(roomId)) {
@@ -40,41 +44,43 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('user-connected', socket.id, userName);
 
     console.log(`${userName} joined room ${roomId}. Users: ${rooms.get(roomId).size}`);
+  });
 
-    // WebRTC signaling: relay offer/answer/ICE between peers
-    socket.on('offer', (offer, targetId) => {
-      io.to(targetId).emit('offer', offer, socket.id);
+  // WebRTC signaling: relay offer/answer/ICE between peers
+  socket.on('offer', (offer, targetId) => {
+    io.to(targetId).emit('offer', offer, socket.id);
+  });
+
+  socket.on('answer', (answer, targetId) => {
+    io.to(targetId).emit('answer', answer, socket.id);
+  });
+
+  socket.on('ice-candidate', (candidate, targetId) => {
+    io.to(targetId).emit('ice-candidate', candidate, socket.id);
+  });
+
+  // Chat relay: broadcast to everyone in the room
+  socket.on('chat-message', (message) => {
+    if (!currentRoomId) return;
+    const user = rooms.get(currentRoomId)?.get(socket.id);
+    io.to(currentRoomId).emit('chat-message', {
+      userId: socket.id,
+      name: user ? user.name : 'Unknown',
+      message,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     });
+  });
 
-    socket.on('answer', (answer, targetId) => {
-      io.to(targetId).emit('answer', answer, socket.id);
-    });
-
-    socket.on('ice-candidate', (candidate, targetId) => {
-      io.to(targetId).emit('ice-candidate', candidate, socket.id);
-    });
-
-    // Chat relay: broadcast to everyone in the room
-    socket.on('chat-message', (message) => {
-      const user = rooms.get(roomId)?.get(socket.id);
-      io.to(roomId).emit('chat-message', {
-        userId: socket.id,
-        name: user ? user.name : 'Unknown',
-        message,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      });
-    });
-
-    socket.on('disconnect', () => {
-      if (rooms.has(roomId)) {
-        rooms.get(roomId).delete(socket.id);
-        if (rooms.get(roomId).size === 0) {
-          rooms.delete(roomId);
-        }
+  socket.on('disconnect', () => {
+    if (!currentRoomId) return;
+    if (rooms.has(currentRoomId)) {
+      rooms.get(currentRoomId).delete(socket.id);
+      if (rooms.get(currentRoomId).size === 0) {
+        rooms.delete(currentRoomId);
       }
-      socket.to(roomId).emit('user-disconnected', socket.id);
-      console.log(`User ${socket.id} left room ${roomId}`);
-    });
+    }
+    socket.to(currentRoomId).emit('user-disconnected', socket.id);
+    console.log(`User ${socket.id} left room ${currentRoomId}`);
   });
 });
 
