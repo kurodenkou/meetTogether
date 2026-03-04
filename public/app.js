@@ -266,14 +266,6 @@ function addRemoteVideoTile(peerId, stream) {
 }
 
 function updateGridLayout() {
-  const total = 1 + Object.keys(peerMeta).filter((id) => peerMeta[id].tileEl).length;
-  videoGrid.className = 'video-grid';
-  if (total === 2) videoGrid.classList.add('count-2');
-  else if (total === 3) videoGrid.classList.add('count-3');
-  else if (total === 4) videoGrid.classList.add('count-4');
-  else if (total === 5) videoGrid.classList.add('count-5');
-  else if (total === 6) videoGrid.classList.add('count-6');
-  else if (total >= 7) videoGrid.classList.add('count-many');
   updateParticipantCount();
 }
 
