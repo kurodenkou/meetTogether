@@ -117,9 +117,10 @@ socket.on('disconnect', () => {
 // Server sends us the list of users already in the room
 socket.on('existing-users', (users) => {
   users.forEach(({ id, name }) => {
-    // We are the newcomer — they will send us offers after receiving user-connected
-    // Just register their meta; peer connection created when offer arrives
+    // We are the newcomer — create a placeholder tile immediately;
+    // peer connection + video is established when the offer arrives
     peerMeta[id] = { name };
+    addRemoteVideoTile(id, null);
   });
   updateParticipantCount();
 });
@@ -127,6 +128,7 @@ socket.on('existing-users', (users) => {
 // A new user joined — we (existing user) initiate the offer
 socket.on('user-connected', async (peerId, peerName) => {
   peerMeta[peerId] = { name: peerName };
+  addRemoteVideoTile(peerId, null); // show tile immediately
   await createPeerConnection(peerId, true); // true = we are the initiator
   updateGridLayout();
   showToast(`${peerName} joined`);
@@ -211,11 +213,16 @@ async function createPeerConnection(peerId, isInitiator) {
     }
   };
 
-  // Remote track arrives → show in video grid
+  // Remote track arrives → populate the existing tile with the live stream
   pc.ontrack = (event) => {
     const stream = event.streams[0];
+    if (!stream) return;
     if (peerMeta[peerId] && peerMeta[peerId].videoEl) {
       peerMeta[peerId].videoEl.srcObject = stream;
+      // Hide avatar now that video is flowing
+      if (peerMeta[peerId].avatarEl) {
+        peerMeta[peerId].avatarEl.classList.add('hidden');
+      }
     } else {
       addRemoteVideoTile(peerId, stream);
     }
@@ -282,7 +289,8 @@ function addRemoteVideoTile(peerId, stream) {
   video.srcObject = stream;
 
   const avatar = document.createElement('div');
-  avatar.className = 'tile-avatar hidden';
+  // Show avatar as placeholder until video stream arrives
+  avatar.className = stream ? 'tile-avatar hidden' : 'tile-avatar';
   avatar.textContent = name.charAt(0).toUpperCase();
 
   const label = document.createElement('div');
