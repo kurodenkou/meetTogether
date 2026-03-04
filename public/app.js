@@ -144,31 +144,38 @@ socket.on('user-disconnected', (peerId) => {
 
 // Receive an offer (we are the responder)
 socket.on('offer', async (offer, fromId) => {
-  if (!peers[fromId]) {
-    await createPeerConnection(fromId, false);
+  try {
+    if (!peers[fromId]) {
+      await createPeerConnection(fromId, false);
+    }
+    const pc = peers[fromId];
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    await drainIceCandidates(fromId);
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    socket.emit('answer', answer, fromId);
+  } catch (err) {
+    console.error('Error handling offer from', fromId, err);
   }
-  const pc = peers[fromId];
-  await pc.setRemoteDescription(new RTCSessionDescription(offer));
-  await drainIceCandidates(fromId);
-  const answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-  socket.emit('answer', answer, fromId);
 });
 
 // Receive an answer (we sent the offer earlier)
 socket.on('answer', async (answer, fromId) => {
-  const pc = peers[fromId];
-  if (pc) {
-    await pc.setRemoteDescription(new RTCSessionDescription(answer));
-    await drainIceCandidates(fromId);
+  try {
+    const pc = peers[fromId];
+    if (pc) {
+      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      await drainIceCandidates(fromId);
+    }
+  } catch (err) {
+    console.error('Error handling answer from', fromId, err);
   }
 });
 
-// Receive ICE candidate — buffer if remote description not yet set
+// Receive ICE candidate — buffer if peer connection or remote description not yet ready
 socket.on('ice-candidate', async (candidate, fromId) => {
   const pc = peers[fromId];
-  if (!pc) return;
-  if (!pc.remoteDescription) {
+  if (!pc || !pc.remoteDescription) {
     if (!iceCandidateBuffers[fromId]) iceCandidateBuffers[fromId] = [];
     iceCandidateBuffers[fromId].push(candidate);
     return;
@@ -401,7 +408,7 @@ window.toggleScreenShare = async function () {
   if (!isScreenSharing) {
     try {
       screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { cursor: 'always' },
+        video: true,
         audio: true,
       });
     } catch (err) {
