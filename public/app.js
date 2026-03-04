@@ -206,6 +206,16 @@ async function createPeerConnection(peerId, isInitiator) {
     });
   }
 
+  // If screen sharing is already active, replace the video sender with the
+  // screen track so that participants who join mid-share see the screen.
+  if (isScreenSharing && screenStream) {
+    const screenTrack = screenStream.getVideoTracks()[0];
+    if (screenTrack) {
+      const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+      if (sender) sender.replaceTrack(screenTrack);
+    }
+  }
+
   // Pre-create the remote stream and wire it to the tile's video element.
   // Adding tracks to it as they arrive avoids relying on event.streams[0],
   // which can be undefined in some browsers with unified-plan SDP.
