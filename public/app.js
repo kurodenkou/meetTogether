@@ -121,6 +121,7 @@ socket.on('existing-users', (users) => {
     // Just register their meta; peer connection created when offer arrives
     peerMeta[id] = { name };
   });
+  updateParticipantCount();
 });
 
 // A new user joined — we (existing user) initiate the offer
@@ -306,7 +307,7 @@ function updateGridLayout() {
 }
 
 function updateParticipantCount() {
-  const total = 1 + Object.keys(peerMeta).filter((id) => peerMeta[id].tileEl).length;
+  const total = 1 + Object.keys(peerMeta).length;
   participantCount.textContent = total === 1 ? '1 participant' : `${total} participants`;
 }
 
