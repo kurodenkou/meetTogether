@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>meetTogether</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="landing-page">
+
+  <div class="landing-container">
+    <div class="landing-brand">
+      <div class="brand-icon">&#127909;</div>
+      <h1>meetTogether</h1>
+      <p>Simple, free video conferencing</p>
+    </div>
+
+    <div class="landing-card">
+      <div class="input-group">
+        <label for="name-input">Your name</label>
+        <input
+          type="text"
+          id="name-input"
+          placeholder="Enter your name"
+          maxlength="30"
+          autofocus
+        >
+      </div>
+
+      <div class="input-group">
+        <label for="room-input">Room name <span class="label-hint">(optional — leave blank to create new)</span></label>
+        <input
+          type="text"
+          id="room-input"
+          placeholder="Enter room name or leave blank"
+          maxlength="40"
+        >
+      </div>
+
+      <button class="btn-primary" onclick="joinRoom()">
+        Join Meeting
+      </button>
+
+      <div class="landing-or">or</div>
+
+      <button class="btn-secondary" onclick="createRoom()">
+        + New Meeting
+      </button>
+    </div>
+
+    <p class="landing-footer">
+      No account required &middot; Works in your browser
+    </p>
+  </div>
+
+  <script>
+    function generateRoomId() {
+      return Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
+
+    function joinRoom() {
+      const name = document.getElementById('name-input').value.trim() || 'Guest';
+      const roomInput = document.getElementById('room-input').value.trim();
+      const room = roomInput || generateRoomId();
+      window.location.href = `/room.html?room=${encodeURIComponent(room)}&name=${encodeURIComponent(name)}`;
+    }
+
+    function createRoom() {
+      const name = document.getElementById('name-input').value.trim() || 'Guest';
+      const room = generateRoomId();
+      window.location.href = `/room.html?room=${encodeURIComponent(room)}&name=${encodeURIComponent(name)}`;
+    }
+
+    document.getElementById('name-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') document.getElementById('room-input').focus();
+    });
+    document.getElementById('room-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') joinRoom();
+    });
+  </script>
+</body>
+</html>
