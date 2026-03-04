@@ -30,6 +30,10 @@ let timerInterval = null;
 const peers = {};
 // peerId -> { name, videoEl, tileEl }
 const peerMeta = {};
+// ICE candidates that arrived before setRemoteDescription was called
+const iceCandidateBuffers = {}; // peerId -> RTCIceCandidateInit[]
+// Timers for the transient "disconnected" state
+const disconnectTimers = {}; // peerId -> setTimeout handle
 
 // ---- DOM refs ----
 const videoGrid = document.getElementById('video-grid');
@@ -116,12 +120,15 @@ socket.on('user-connected', async (peerId, peerName) => {
   peerMeta[peerId] = { name: peerName };
   await createPeerConnection(peerId, true); // true = we are the initiator
   updateGridLayout();
+  showToast(`${peerName} joined`);
 });
 
 // A user left
 socket.on('user-disconnected', (peerId) => {
+  const name = peerMeta[peerId]?.name || 'Someone';
   removePeer(peerId);
   updateGridLayout();
+  showToast(`${name} left`);
 });
 
 // Receive an offer (we are the responder)
@@ -131,6 +138,7 @@ socket.on('offer', async (offer, fromId) => {
   }
   const pc = peers[fromId];
   await pc.setRemoteDescription(new RTCSessionDescription(offer));
+  await drainIceCandidates(fromId);
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
   socket.emit('answer', answer, fromId);
@@ -141,18 +149,23 @@ socket.on('answer', async (answer, fromId) => {
   const pc = peers[fromId];
   if (pc) {
     await pc.setRemoteDescription(new RTCSessionDescription(answer));
+    await drainIceCandidates(fromId);
   }
 });
 
-// Receive ICE candidate
+// Receive ICE candidate — buffer if remote description not yet set
 socket.on('ice-candidate', async (candidate, fromId) => {
   const pc = peers[fromId];
-  if (pc) {
-    try {
-      await pc.addIceCandidate(new RTCIceCandidate(candidate));
-    } catch (e) {
-      // Ignore benign ICE errors
-    }
+  if (!pc) return;
+  if (!pc.remoteDescription) {
+    if (!iceCandidateBuffers[fromId]) iceCandidateBuffers[fromId] = [];
+    iceCandidateBuffers[fromId].push(candidate);
+    return;
+  }
+  try {
+    await pc.addIceCandidate(new RTCIceCandidate(candidate));
+  } catch (e) {
+    // Ignore benign ICE errors
   }
 });
 
@@ -201,7 +214,19 @@ async function createPeerConnection(peerId, isInitiator) {
 
   pc.onconnectionstatechange = () => {
     const state = pc.connectionState;
-    if (state === 'disconnected' || state === 'failed' || state === 'closed') {
+    if (state === 'connected') {
+      // Cancel any pending removal from a transient disconnection
+      clearTimeout(disconnectTimers[peerId]);
+      delete disconnectTimers[peerId];
+    } else if (state === 'disconnected') {
+      // "disconnected" is often a brief network hiccup — wait before removing
+      disconnectTimers[peerId] = setTimeout(() => {
+        removePeer(peerId);
+        updateGridLayout();
+      }, 5000);
+    } else if (state === 'failed' || state === 'closed') {
+      clearTimeout(disconnectTimers[peerId]);
+      delete disconnectTimers[peerId];
       removePeer(peerId);
       updateGridLayout();
     }
@@ -217,6 +242,9 @@ async function createPeerConnection(peerId, isInitiator) {
 }
 
 function removePeer(peerId) {
+  clearTimeout(disconnectTimers[peerId]);
+  delete disconnectTimers[peerId];
+  delete iceCandidateBuffers[peerId];
   if (peers[peerId]) {
     peers[peerId].close();
     delete peers[peerId];
@@ -266,14 +294,6 @@ function addRemoteVideoTile(peerId, stream) {
 }
 
 function updateGridLayout() {
-  const total = 1 + Object.keys(peerMeta).filter((id) => peerMeta[id].tileEl).length;
-  videoGrid.className = 'video-grid';
-  if (total === 2) videoGrid.classList.add('count-2');
-  else if (total === 3) videoGrid.classList.add('count-3');
-  else if (total === 4) videoGrid.classList.add('count-4');
-  else if (total === 5) videoGrid.classList.add('count-5');
-  else if (total === 6) videoGrid.classList.add('count-6');
-  else if (total >= 7) videoGrid.classList.add('count-many');
   updateParticipantCount();
 }
 
@@ -522,6 +542,30 @@ function startTimer() {
 // =====================================================
 // Helpers
 // =====================================================
+
+async function drainIceCandidates(peerId) {
+  const buf = iceCandidateBuffers[peerId];
+  if (!buf || buf.length === 0) return;
+  iceCandidateBuffers[peerId] = [];
+  const pc = peers[peerId];
+  if (!pc) return;
+  for (const c of buf) {
+    try { await pc.addIceCandidate(new RTCIceCandidate(c)); } catch {}
+  }
+}
+
+function showToast(message) {
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  // Trigger transition on next frame
+  requestAnimationFrame(() => toast.classList.add('show'));
+  setTimeout(() => {
+    toast.classList.remove('show');
+    toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+  }, 3000);
+}
 
 function setStatus(type, text) {
   connectionStatus.className = `status-dot ${type}`;
