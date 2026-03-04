@@ -410,11 +410,25 @@ window.toggleScreenShare = async function () {
     }
 
     const screenTrack = screenStream.getVideoTracks()[0];
+    if (!screenTrack) {
+      screenStream.getTracks().forEach((t) => t.stop());
+      screenStream = null;
+      return;
+    }
 
-    // Replace video track in all peer connections
+    // Replace video track in all peer connections.
+    // Guard each call individually so a single bad sender can't abort setup.
     Object.values(peers).forEach((pc) => {
-      const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
-      if (sender) sender.replaceTrack(screenTrack);
+      try {
+        const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+        if (sender) {
+          sender.replaceTrack(screenTrack).catch((err) => {
+            console.warn('replaceTrack failed for peer:', err);
+          });
+        }
+      } catch (err) {
+        console.warn('replaceTrack threw for peer:', err);
+      }
     });
 
     // Show a placeholder on the local tile instead of the screen itself
