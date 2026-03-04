@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>meetTogether</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="room-page">
+
+  <!-- Top bar -->
+  <header class="room-header">
+    <div class="room-brand">&#127909; meetTogether</div>
+    <div class="room-info">
+      <span id="room-name-display"></span>
+      <button class="btn-copy" id="copy-btn" onclick="copyRoomLink()" title="Copy meeting link">
+        &#128279; Copy Link
+      </button>
+    </div>
+    <div class="room-meta">
+      <span id="participant-count">1 participant</span>
+    </div>
+  </header>
+
+  <!-- Main area -->
+  <main class="room-main" id="room-main">
+
+    <!-- Video grid -->
+    <div class="video-grid" id="video-grid">
+      <!-- Local video tile -->
+      <div class="video-tile local-tile" id="local-tile">
+        <video id="local-video" autoplay muted playsinline></video>
+        <div class="tile-label">
+          <span id="local-name-label">You</span>
+          <span class="tile-badges" id="local-badges"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat sidebar -->
+    <aside class="chat-sidebar" id="chat-sidebar">
+      <div class="chat-header">
+        <span>In-call messages</span>
+        <button class="btn-icon" onclick="toggleChat()" title="Close chat">&#10005;</button>
+      </div>
+      <div class="chat-messages" id="chat-messages">
+        <div class="chat-notice">Messages are only visible to people in this call</div>
+      </div>
+      <div class="chat-input-area">
+        <input
+          type="text"
+          id="chat-input"
+          placeholder="Send a message..."
+          maxlength="500"
+          onkeypress="handleChatKey(event)"
+        >
+        <button class="btn-send" onclick="sendMessage()" title="Send">&#10148;</button>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- Bottom controls bar -->
+  <footer class="controls-bar">
+    <div class="controls-left">
+      <div class="control-timer" id="call-timer">00:00</div>
+    </div>
+
+    <div class="controls-center">
+      <!-- Mute/Unmute -->
+      <div class="control-item">
+        <button class="ctrl-btn" id="mic-btn" onclick="toggleAudio()" title="Mute/Unmute">
+          <span id="mic-icon">&#127897;</span>
+        </button>
+        <span class="ctrl-label" id="mic-label">Mute</span>
+      </div>
+
+      <!-- Camera on/off -->
+      <div class="control-item">
+        <button class="ctrl-btn" id="cam-btn" onclick="toggleVideo()" title="Camera on/off">
+          <span id="cam-icon">&#128249;</span>
+        </button>
+        <span class="ctrl-label" id="cam-label">Stop Video</span>
+      </div>
+
+      <!-- Screen share -->
+      <div class="control-item">
+        <button class="ctrl-btn" id="screen-btn" onclick="toggleScreenShare()" title="Share screen">
+          <span id="screen-icon">&#128438;</span>
+        </button>
+        <span class="ctrl-label" id="screen-label">Share Screen</span>
+      </div>
+
+      <!-- Chat toggle -->
+      <div class="control-item">
+        <button class="ctrl-btn" id="chat-btn" onclick="toggleChat()" title="Chat">
+          <span>&#128172;</span>
+          <span class="chat-badge hidden" id="chat-badge">0</span>
+        </button>
+        <span class="ctrl-label">Chat</span>
+      </div>
+
+      <!-- Leave -->
+      <div class="control-item">
+        <button class="ctrl-btn danger-btn" onclick="leaveRoom()" title="Leave meeting">
+          <span>&#128222;</span>
+        </button>
+        <span class="ctrl-label">Leave</span>
+      </div>
+    </div>
+
+    <div class="controls-right">
+      <span id="connection-status" class="status-dot connecting">Connecting...</span>
+    </div>
+  </footer>
+
+  <!-- Permission error overlay -->
+  <div class="overlay hidden" id="perm-overlay">
+    <div class="overlay-card">
+      <div class="overlay-icon">&#128247;</div>
+      <h2>Camera & microphone needed</h2>
+      <p>meetTogether needs access to your camera and microphone to join the call.</p>
+      <p>Please allow access in your browser and refresh the page.</p>
+      <button class="btn-primary" onclick="location.reload()">Try again</button>
+      <button class="btn-secondary" onclick="joinWithoutMedia()">Join without camera/mic</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
