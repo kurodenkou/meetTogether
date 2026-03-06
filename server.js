@@ -35,7 +35,7 @@ io.on('connection', (socket) => {
     const existingUsers = [];
     rooms.get(roomId).forEach((user, socketId) => {
       if (socketId !== socket.id) {
-        existingUsers.push({ id: socketId, name: user.name });
+        existingUsers.push({ id: socketId, name: user.name, isScreenSharing: user.isScreenSharing || false });
       }
     });
     socket.emit('existing-users', existingUsers);
@@ -61,11 +61,19 @@ io.on('connection', (socket) => {
 
   // Screen share state relay: broadcast to everyone else in the room
   socket.on('screen-share-started', () => {
-    if (currentRoomId) socket.to(currentRoomId).emit('screen-share-started', socket.id);
+    if (currentRoomId) {
+      const user = rooms.get(currentRoomId)?.get(socket.id);
+      if (user) user.isScreenSharing = true;
+      socket.to(currentRoomId).emit('screen-share-started', socket.id);
+    }
   });
 
   socket.on('screen-share-stopped', () => {
-    if (currentRoomId) socket.to(currentRoomId).emit('screen-share-stopped', socket.id);
+    if (currentRoomId) {
+      const user = rooms.get(currentRoomId)?.get(socket.id);
+      if (user) user.isScreenSharing = false;
+      socket.to(currentRoomId).emit('screen-share-stopped', socket.id);
+    }
   });
 
   // Chat relay: broadcast to everyone in the room

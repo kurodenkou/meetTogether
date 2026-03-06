@@ -124,6 +124,10 @@ socket.on('existing-users', (users) => {
     addRemoteVideoTile(id, null);
   });
   updateParticipantCount();
+
+  // If someone is already screen sharing, promote their tile to the main stage
+  const sharer = users.find((u) => u.isScreenSharing);
+  if (sharer) setSpotlight(sharer.id);
 });
 
 // A new user joined — we (existing user) initiate the offer
