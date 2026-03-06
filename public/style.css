@@ -321,6 +321,58 @@ html, body {
   display: none;
 }
 
+/* =====================
+   Spotlight layout (screen share)
+   ===================== */
+.video-grid.has-spotlight {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-content: stretch;
+  padding: 8px;
+  gap: 0;
+}
+
+.video-tile.spotlight {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  margin-bottom: 8px;
+}
+
+/* Show full screen content without cropping */
+.video-tile.spotlight .screen-share-video {
+  object-fit: contain;
+}
+
+.thumbnail-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0;
+  flex-shrink: 0;
+  align-items: center;
+  min-height: 100px;
+}
+
+.thumbnail-strip::-webkit-scrollbar {
+  height: 4px;
+}
+
+.thumbnail-strip::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thumbnail-strip::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.thumbnail-strip .video-tile {
+  width: 120px;
+  height: 90px;
+  flex-shrink: 0;
+}
+
 /* Screen share placeholder shown on local tile */
 .screen-share-indicator {
   position: absolute;
