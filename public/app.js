@@ -22,6 +22,7 @@ let screenStream = null;
 let isAudioMuted = false;
 let isVideoOff = false;
 let isScreenSharing = false;
+let spotlightPeerId = null;
 let isChatOpen = false;
 let unreadMessages = 0;
 let callStartTime = null;
@@ -187,6 +188,15 @@ socket.on('ice-candidate', async (candidate, fromId) => {
   }
 });
 
+// Screen share state from a remote peer
+socket.on('screen-share-started', (peerId) => {
+  setSpotlight(peerId);
+});
+
+socket.on('screen-share-stopped', (peerId) => {
+  clearSpotlight();
+});
+
 // Chat message
 socket.on('chat-message', ({ userId, name, message, timestamp }) => {
   const isSelf = userId === socket.id;
@@ -279,6 +289,7 @@ async function createPeerConnection(peerId, isInitiator) {
 }
 
 function removePeer(peerId) {
+  if (peerId === spotlightPeerId) clearSpotlight();
   clearTimeout(disconnectTimers[peerId]);
   delete disconnectTimers[peerId];
   delete iceCandidateBuffers[peerId];
@@ -321,7 +332,14 @@ function addRemoteVideoTile(peerId, stream) {
   tile.appendChild(video);
   tile.appendChild(avatar);
   tile.appendChild(label);
-  videoGrid.appendChild(tile);
+
+  // If spotlight is active, new tiles belong in the thumbnail strip
+  const strip = document.getElementById('thumbnail-strip');
+  if (strip) {
+    strip.appendChild(tile);
+  } else {
+    videoGrid.appendChild(tile);
+  }
 
   if (!peerMeta[peerId]) peerMeta[peerId] = {};
   peerMeta[peerId].videoEl = video;
@@ -444,6 +462,7 @@ window.toggleScreenShare = async function () {
     showScreenShareIndicator();
 
     isScreenSharing = true;
+    socket.emit('screen-share-started');
     btn.classList.add('active');
     label.textContent = 'Stop Share';
     icon.textContent = '🖥';
@@ -477,6 +496,7 @@ async function stopScreenShare() {
   hideScreenShareIndicator();
 
   isScreenSharing = false;
+  socket.emit('screen-share-stopped');
   const btn = document.getElementById('screen-btn');
   const label = document.getElementById('screen-label');
   const icon = document.getElementById('screen-icon');
@@ -500,6 +520,48 @@ function showScreenShareIndicator() {
 function hideScreenShareIndicator() {
   const el = document.getElementById('screen-share-indicator');
   if (el) el.classList.add('hidden');
+}
+
+function setSpotlight(peerId) {
+  if (spotlightPeerId) clearSpotlight();
+  const tile = peerMeta[peerId]?.tileEl;
+  if (!tile) return;
+
+  spotlightPeerId = peerId;
+  videoGrid.classList.add('has-spotlight');
+  tile.classList.add('spotlight');
+
+  // Use contain so the full screen content is visible without cropping
+  const video = peerMeta[peerId]?.videoEl;
+  if (video) video.classList.add('screen-share-video');
+
+  // Move all non-spotlight tiles into a thumbnail strip
+  const strip = document.createElement('div');
+  strip.id = 'thumbnail-strip';
+  strip.className = 'thumbnail-strip';
+  videoGrid.appendChild(strip);
+
+  videoGrid.querySelectorAll('.video-tile:not(.spotlight)').forEach((t) => strip.appendChild(t));
+}
+
+function clearSpotlight() {
+  if (!spotlightPeerId) return;
+
+  const tile = peerMeta[spotlightPeerId]?.tileEl;
+  if (tile) {
+    tile.classList.remove('spotlight');
+    const video = peerMeta[spotlightPeerId]?.videoEl;
+    if (video) video.classList.remove('screen-share-video');
+  }
+
+  const strip = document.getElementById('thumbnail-strip');
+  if (strip) {
+    while (strip.firstChild) videoGrid.insertBefore(strip.firstChild, strip);
+    strip.remove();
+  }
+
+  videoGrid.classList.remove('has-spotlight');
+  spotlightPeerId = null;
 }
 
 // =====================================================

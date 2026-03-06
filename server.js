@@ -59,6 +59,15 @@ io.on('connection', (socket) => {
     io.to(targetId).emit('ice-candidate', candidate, socket.id);
   });
 
+  // Screen share state relay: broadcast to everyone else in the room
+  socket.on('screen-share-started', () => {
+    if (currentRoomId) socket.to(currentRoomId).emit('screen-share-started', socket.id);
+  });
+
+  socket.on('screen-share-stopped', () => {
+    if (currentRoomId) socket.to(currentRoomId).emit('screen-share-stopped', socket.id);
+  });
+
   // Chat relay: broadcast to everyone in the room
   socket.on('chat-message', (message) => {
     if (!currentRoomId) return;
