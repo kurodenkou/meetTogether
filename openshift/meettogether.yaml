@@ -1,0 +1,131 @@
+# meetTogether on OpenShift.
+#   oc new-project meettogether
+#   oc apply -f openshift/meettogether.yaml
+#   oc start-build meettogether --follow
+#
+# Runs as a single replica: room state lives in server memory, so
+# multiple pods would split users of the same room across processes.
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: meettogether
+  labels:
+    app: meettogether
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: meettogether
+  labels:
+    app: meettogether
+spec:
+  source:
+    type: Git
+    git:
+      uri: https://github.com/kurodenkou/meetTogether.git
+      ref: main
+    # For a private repo, create a secret and uncomment:
+    #   oc create secret generic github-token --type=kubernetes.io/basic-auth \
+    #     --from-literal=username=<user> --from-literal=password=<PAT>
+    # sourceSecret:
+    #   name: github-token
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Dockerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: meettogether:latest
+  triggers:
+    - type: ConfigChange
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: meettogether
+  labels:
+    app: meettogether
+  annotations:
+    # Roll the deployment whenever a new image lands in the ImageStream.
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"meettogether:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"meettogether\")].image"}]
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: meettogether
+  template:
+    metadata:
+      labels:
+        app: meettogether
+    spec:
+      containers:
+        - name: meettogether
+          image: meettogether:latest
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: PORT
+              value: "8080"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: meettogether
+  labels:
+    app: meettogether
+spec:
+  selector:
+    app: meettogether
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: meettogether
+  labels:
+    app: meettogether
+  annotations:
+    # Keep idle socket.io websockets open (default HAProxy timeout is 30s).
+    haproxy.router.openshift.io/timeout: 1h
+spec:
+  to:
+    kind: Service
+    name: meettogether
+  port:
+    targetPort: http
+  # Browsers only allow camera/mic/screen capture on HTTPS origins.
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
